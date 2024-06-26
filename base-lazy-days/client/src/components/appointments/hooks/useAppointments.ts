@@ -1,10 +1,10 @@
 import dayjs from "dayjs";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 import { AppointmentDateMap } from "../types";
 import { getAvailableAppointments } from "../utils";
 import { getMonthYearDetails, getNewMonthYear } from "./monthYear";
-
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLoginData } from "@/auth/AuthContext";
 import { axiosInstance } from "@/axiosInstance";
 import { queryKeys } from "@/react-query/constants";
@@ -49,11 +49,22 @@ export function useAppointments() {
   // We need the user to pass to getAvailableAppointments so we can show
   //   appointments that the logged-in user has reserved (in white)
   const { userId } = useLoginData();
-
+  const selectFn = (data: AppointmentDateMap, showAll: boolean) => {};
   /** ****************** END 2: filter appointments  ******************** */
   /** ****************** START 3: useQuery  ***************************** */
   // useQuery call for appointments for the current monthYear
-
+   const queryClient = useQueryClient();
+   useEffect(() => {
+    const nextMonthYear = getNewMonthYear(monthYear, 1);
+    queryClient.prefetchQuery({
+      queryKey: [
+        queryKeys.appointments,
+        nextMonthYear.year,
+        nextMonthYear.month,
+      ],
+      queryFn: () => getAppointments(nextMonthYear.year, nextMonthYear.month),
+    });
+   },[queryClient,monthYear ]);
   // TODO: update with useQuery!
   // Notes:
   //    1. appointments is an AppointmentDateMap (object with days of month
@@ -61,7 +72,13 @@ export function useAppointments() {
   //
   //    2. The getAppointments query function needs monthYear.year and
   //       monthYear.month
-  const appointments: AppointmentDateMap = {};
+  const fallback: AppointmentDateMap = {};
+
+  const {data: appointments = fallback} = useQuery({
+    queryKey: [queryKeys.appointments, monthYear, monthYear.month ],
+    queryFn: () => getAppointments(monthYear.year, monthYear.month),
+    select:(data) => selectFn(data, showAll),
+  })
 
   /** ****************** END 3: useQuery  ******************************* */
 
